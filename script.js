@@ -1,5 +1,6 @@
 let message = document.querySelector('.message')
 
+
 // opening trigger 
 function showFriendForm(){
     const opening = document.querySelector('.opening')
@@ -23,7 +24,66 @@ const cpu= document.querySelector('#CPU');
 cpu.onclick=showCpuForm
 
 
+// take name inputted 
 
+const playFriends = document.querySelector('#friends')
+playFriends.addEventListener('click',(e)=>{
+    let player1 = document.querySelector('#player1').value;
+    let player2 = document.querySelector('#player2').value;
+
+    if (player1 == ''){
+        player1 ='Player1';
+    }
+    if (player2 ==''){
+        player2='Player2';
+    }
+    console.log(player1);
+    console.log(player2)
+
+    gameBoard.makePlayer1(player1);
+    gameBoard.makePlayer2(player2);
+
+
+    console.log('Hello friends.')
+    //Start 
+    changeMessage(gameBoard.currentPlayer().name,gameBoard.currentPlayer().mark)
+    //hide form and show board 
+    showBoard()
+})
+
+
+// play with CPU
+
+const cpuButton = document.querySelector('#cpu')
+cpuButton.addEventListener('click',(e)=>{
+    let player1 = document.querySelector('#player1c').value;
+    const level =  document.querySelector('#levels').value;
+    if (player1 == ''){
+        player1 ='Player1';
+    }
+    
+    gameBoard.makePlayer1(player1); 
+    gameBoard.makePlayer2('CPU',false);
+    gameBoard.setLevel(level);
+    console.log(`Hello ${level} .`)
+    //Start 
+    changeMessage(gameBoard.currentPlayer().name,gameBoard.currentPlayer().mark)
+    //hide form and show board 
+    showBoard()
+})
+
+
+
+function showBoard(){
+    const friendForm = document.querySelector('.form-friends');
+    const cpuForm = document.querySelector('.form-cpu');
+    const messageDiv = document.querySelector('.message-div');
+    const boardDiv = document.querySelector('.board-div');
+    messageDiv.style.display='block';
+    boardDiv.style.display='grid'
+    friendForm.style.display='none';
+    cpuForm.style.display='none';
+}
 
 
 
@@ -31,7 +91,7 @@ const restart = document.querySelector('#restart')
 restart.addEventListener('click',(e)=> {
     console.log('restart');
     gameBoard.startOver();
-    changeMessage(gameBoard.turn.name,gameBoard.turn.mark)
+    changeMessage(gameBoard.currentPlayer().name,gameBoard.currentPlayer().mark)
     cleanUI();
     hideRestart()
 
@@ -44,8 +104,8 @@ function cleanUI(){
     return;})
 }
 
-const playerFactory = (name,mark) => {
-    return {name,mark}
+const playerFactory = (name,mark,isHuman=true) => {
+    return {name,mark,isHuman}
 }
 
 
@@ -53,22 +113,51 @@ const gameBoard = (function (){
     let board = [['_','_','_'],
                  ['_','_','_'],
                  ['_','_','_']]
-    const p1 = playerFactory('Sato','X');
-    const p2 = playerFactory('Relakku','O');
+    let p1;
+    let p2;
+    let cpuLevel;
     let moves = 0;
     //x play first
-    let turn = p1
+    let turn = p1;
     let gameEnd=false;
     
     function show(){
         console.log(board)
-  
+    }
+    
+    function setLevel(lv){
+        cpuLevel = lv;
     }
 
+    function cpuMove(){
+        const oneArray = [...board[0],...board[1],...board[2]]
+        
+         //random move from available position
+        console.log(board);
+        const availableMove=[]
+        for (let i=0; i<9;i++){
+            if (oneArray.at(i)=='_'){
+        availableMove.push(i+1)
+        }
+        }
+        if (cpuLevel=='Beginner'){
+        const randomElement = availableMove[Math.floor(Math.random() * availableMove.length)];
+        return randomElement;
+        }
+    }
 
     function chooseMove(row,column,mark){
          board[row][column] =mark;
          moves++;
+    }
+
+    function makePlayer1(name){
+        p1 = playerFactory(name,'X'); 
+        turn = p1;
+    }
+     
+    function makePlayer2(name,isHuman=true){
+        p2 = playerFactory(name,'O',isHuman);   
     }
 
     function changePlayer(){
@@ -194,6 +283,10 @@ const gameBoard = (function (){
        isTie:isTie,
        gameOn:gameOn,
        startOver:startOver,
+       makePlayer1:makePlayer1,
+       makePlayer2:makePlayer2,
+       setLevel:setLevel,
+       cpuMove:cpuMove,
        }
 
 })();
@@ -248,7 +341,7 @@ function getNumbers(index){
 document.querySelectorAll(".item").forEach(cell =>
     {
         cell.addEventListener('click',(e)=>{
-        if (e.target.innerText=='' & !gameBoard.gameOn()) {
+        if (e.target.innerText=='' & !gameBoard.gameOn() & gameBoard.currentPlayer().isHuman) {
             const c = gameBoard.currentPlayer();
             e.target.innerText= c.mark;
             // update the board gameBoard
@@ -263,11 +356,49 @@ document.querySelectorAll(".item").forEach(cell =>
                 tieGame();
             }else{
             const t = gameBoard.changePlayer();
-            changeMessage(t.name,t.mark)
-        }
-        }
-        })
+            changeMessage(t.name,t.mark)}
+            cpuWork()
+            
+    }
+    
+        
     })
+
+})
+
+
+const cpuWork = async() =>{
+    await sleep(1000)
+    // for cpu
+    if (gameBoard.currentPlayer().isHuman==false){
+        async () => await sleep(1000)
+        console.log("Time to shine")
+        
+        const idx = gameBoard.cpuMove();
+        console.log(idx);
+        // update the board here first
+        gameBoard.chooseMove(...getNumbers(idx),'O');
+        //update the board in UI
+        const cell = document.querySelector(`#cell${idx}`);
+        cell.innerText= 'O'
+
+    
+        const p = gameBoard.currentPlayer()
+    //check winner again after cpu move
+    if (gameBoard.isWin()){
+        announceGame(p.name,p.mark)
+    }
+    else if (gameBoard.isTie()){
+        tieGame();
+    }else{
+    changeMessage(p.name,p.mark)
+    gameBoard.changePlayer()
+}
+    }
+
+}
+
+
 
 
 function changeMessage(name,mark){
@@ -294,8 +425,7 @@ function hideRestart(){
     restartDiv.style.display='none';
     }
 
-//Start 
-changeMessage(gameBoard.turn.name,gameBoard.turn.mark)
+
 
 
 
@@ -308,3 +438,6 @@ function transpose(matrix) {
     ), []);
   }
 
+
+// https://blog.devgenius.io/how-to-make-javascript-sleep-or-wait-d95d33c99909
+const sleep = (delay) => new Promise((resolve) => setTimeout(resolve,delay))
