@@ -94,6 +94,7 @@ restart.addEventListener('click',(e)=> {
     changeMessage(gameBoard.currentPlayer().name,gameBoard.currentPlayer().mark)
     cleanUI();
     hideRestart()
+    aiPlayer.aiReset()
 
 })
 
@@ -115,6 +116,7 @@ const gameBoard = (function (){
                  ['_','_','_']]
     let p1;
     let p2;
+    let score;
     let cpuLevel;
     let moves = 0;
     //x play first
@@ -122,7 +124,7 @@ const gameBoard = (function (){
     let gameEnd=false;
     
     function show(){
-        console.log(board)
+        return board;
     }
     
     function setLevel(lv){
@@ -143,7 +145,11 @@ const gameBoard = (function (){
         if (cpuLevel=='Beginner'){
         const randomElement = availableMove[Math.floor(Math.random() * availableMove.length)];
         return randomElement;
+        } else {
+            const status = aiPlayer.show();
+            return aiPlayer.minimax(status);
         }
+
     }
 
     function chooseMove(row,column,mark){
@@ -208,6 +214,21 @@ const gameBoard = (function (){
         
     return false;
     }
+
+    // for score comes from isWin()
+    function scoring(){ 
+        if(isWin()){
+          const c = currentPlayer().mark;
+          if(c=='X'){
+            return -1
+          }
+          else if (c=='O'){
+            return 1;
+          }
+        } return 0;
+            
+    }
+
 
     function isTie(){
         if(moves ==9) {
@@ -287,6 +308,7 @@ const gameBoard = (function (){
        makePlayer2:makePlayer2,
        setLevel:setLevel,
        cpuMove:cpuMove,
+       scoring:scoring,
        }
 
 })();
@@ -391,8 +413,10 @@ const cpuWork = async() =>{
     else if (gameBoard.isTie()){
         tieGame();
     }else{
-    changeMessage(p.name,p.mark)
-    gameBoard.changePlayer()
+    
+    const t = gameBoard.changePlayer()
+    changeMessage(t.name,t.mark)
+
 }
     }
 
@@ -441,3 +465,163 @@ function transpose(matrix) {
 
 // https://blog.devgenius.io/how-to-make-javascript-sleep-or-wait-d95d33c99909
 const sleep = (delay) => new Promise((resolve) => setTimeout(resolve,delay))
+
+
+
+//ai minimax https://www.youtube.com/watch?v=D5aJNFWsWew&list=PLBw9d_OueVJS_084gYQexJ38LC2LEhpR4&index=1
+
+const aiPlayer = (function () {
+    //get current board
+    let board = gameBoard.show();
+
+    function aiReset(){
+        board = gameBoard.show();
+    }
+
+    function show (){
+        return board
+    }
+    
+    function isWin(status,mark){
+        // check row 
+        for (let i=0; i<3;i++){
+            if (counter(status[i],mark)){
+                return true
+            }
+        }
+        //check column 
+        const transposed = transpose(status)
+        for (let i=0; i<3;i++){
+            if (counter(transposed[i],mark)){
+                return true
+            }
+        }
+        // check diagonal
+        const left = [status[0][0],status[1][1],status[2][2]]
+        if (counter(left,mark)){
+            return true
+        }
+        const right = [status[2][0],status[1][1],status[0][2]]
+        if (counter(right,mark)){
+            return true
+        }        
+    return false;
+    }
+
+    function isTie(status){
+        const oneArray = [...status[0],...status[1],...status[2]]
+        for (let i=0;i< oneArray.length;i++){
+            if (oneArray[i]=='_'){
+                return false
+            }
+    
+        }
+        return true
+    }
+
+    function gameEnd(status){
+        if (isTie(status) |isWin(status,'X')|isWin(status,'O')){
+            return true;
+        }
+        return false;
+    }
+    function scoreGame(status){
+        if(isWin(status,'O')){
+            return 1
+        } else if (isWin(status,'X')){
+            return -1
+        } else {
+            return 0
+        }
+    }
+
+
+    function availableMove(status){
+        const oneArray = [...status[0],...status[1],...status[2]]
+        
+         //random move from available position
+        const availables=[]
+        for (let i=0; i<9;i++){
+            if (oneArray.at(i)=='_'){
+        availables.push(i+1)
+        }
+        }
+        return availables
+    }
+
+    function chooseMove(status,row,column,mark){
+        // new board each time
+        const clone = structuredClone(status);
+        clone[row][column] = mark;
+        return clone
+        
+   }
+
+    //minmax return optimal action(index)
+    function minimax(status){
+        if (gameEnd(status)){
+            console.log('test')
+        return;
+        }
+        return maximizeScore(status)[1]
+    }
+    
+
+    //Minmax 
+    function maximizeScore(status){
+        if (gameEnd(status)){
+            return [scoreGame(status),]
+        }
+        // maximize this value
+        let value = -1000
+        let move;
+        const moves= availableMove(status)
+
+        // available move array
+        for (let i =0; i<moves.length;i++){
+            
+            const ls = getNumbers(moves[i])
+            // alpha pruning
+            const temp = minimizeScore(chooseMove(status,...ls,'O'))[0]
+            if (temp ==-1){
+                continue
+            }
+            value = Math.max(value, temp)
+            if (value == temp){
+                move = moves[i];
+            }
+        }       
+        return [value, move]
+    }
+
+    function minimizeScore(status){
+        if (gameEnd(status)){
+            return [scoreGame(status),]
+        }
+        // minimize this value
+        let value = 1000
+        let move;
+        const moves= availableMove(status)
+        // available move array
+        for (let i =0; i<moves.length;i++){
+            const ls = getNumbers(moves[i])
+            // alpha pruning
+            const temp = maximizeScore(chooseMove(status,...ls,'X'))[0]
+            if (temp == 1){
+                continue;
+            }
+            value = Math.min(value, temp)
+        }       
+        return [value, move]
+    }
+
+
+    
+    return {show,minimax,isWin,gameEnd,isTie,minimizeScore,maximizeScore,chooseMove,aiReset}
+    
+  
+  }());
+
+
+
+
